@@ -139,8 +139,13 @@ With the necessary tools installed, proceed to deploy the cluster. Follow the st
   
   3. Edit the hosts file on each node by adding the IP addresses and hostnames of the servers that will be part of the cluster.
 
-  4. Restart the terminal application to apply the hostname change.
-  Step 3: Initialize Kubernetes on Master Node
+         10.0.17.180 master-node
+         10.0.21.231 worker01
+         10.128.0.4 worker02
+
+  5. Restart the terminal application to apply the hostname change.
+  
+Step 3: Initialize Kubernetes on Master Node
   
   Once you finish setting up hostnames on cluster nodes, switch to the master node and follow the steps to initialize Kubernetes on it:
   
