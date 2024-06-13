@@ -181,7 +181,7 @@ With the necessary tools installed, proceed to deploy the cluster. Follow the st
 
   7. Open the kubeadm configuration file:
 
-    sudo nano /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    sudo nano /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
 
   8. Add the following line to the file:
 
@@ -248,6 +248,11 @@ With the necessary tools installed, proceed to deploy the cluster. Follow the st
     kubectl get nodes
 
   The system displays the master node and the worker nodes in the cluster.
+  
+  5. On worker nodes, run the following commands to copy kubelet config files on root home directory under .kube/. This will help to locate kubelets.
+      1.     sudo cp /etc/kubernetes/kubelet.conf /root/.kube/config
+      2.     sudo kubectl get nodes
+
 
 Conclusion
 
