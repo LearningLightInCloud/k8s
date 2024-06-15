@@ -12,6 +12,12 @@ Prerequisites
     Command-line access.
     Access to a user account with sudo privileges on each system.
 
+On AWS EC2 setup the security group that allows following ports for inbound connections - 
+    
+    SSH (Port 22)
+    All traffic for Kubernetes control plane (Port 6443)
+    NodePort Services (30000–32767)
+
 Set up Docker
 
 Kubernetes requires a CRI-compliant container engine runtime such as Docker, containerd, or CRI-O. This article shows you how to deploy Kubernetes using Docker.
