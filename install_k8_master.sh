@@ -1,68 +1,102 @@
 #!/bin/bash
 
-master-node=$1
-worker01=$2
-worker02=$3
+# Add Docker's official GPG key:
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
 
-sudo apt update
-sudo apt install docker.io -y
-sudo systemctl enable docker
-sudo systemctl start docker
+# 1. Add the repository to Apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
 
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-sudo apt update
-sudo apt install -y kubeadm kubelet kubectl
-sudo apt-mark hold kubeadm kubelet kubectl
-kubeadm version
+# 2.	Create the configuration file for containerd
+cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
+overlay
+br_netfilter
+EOF
 
-sudo swapoff -a
-sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
-
-echo overlay >> /etc/modules-load.d/containerd.conf
-echo br_netfilter >> /etc/modules-load.d/containerd.conf
-
+# 3.	Load the modules:
 sudo modprobe overlay
 sudo modprobe br_netfilter
 
-echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.d/kubernetes.conf
-echo "net.bridge.bridge-nf-call-iptables = 1" >> /etc/sysctl.d/kubernetes.conf
-echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.d/kubernetes.conf
+# 4.	Set the system configurations for Kubernetes networking
+cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+EOF
 
+# 5.	Apply the new settings
 sudo sysctl --system
-sudo hostnamectl set-hostname master-node
-sudo hostnamectl set-hostname worker01
 
-echo "${master-node} master-node" >> /etc/hosts
-echo "${worker01} worker01" >> /etc/hosts
-echo "${worker02} worker02"  >> /etc/hosts
+# 6.	Install containerd
+sudo apt-get update && sudo apt-get install -y containerd.io
 
-echo "KUBELET_EXTRA_ARGS=\"--cgroup-driver=cgroupfs\"" >> /etc/default/kubelet
-sudo systemctl daemon-reload && sudo systemctl restart kubelet
+# 7.	Create the default configuration file for containerd
+sudo mkdir -p /etc/containerd
 
-echo "{
-   \"exec-opts\": [\"native.cgroupdriver=systemd\"],
-   \"log-driver\": \"json-file\",
-   \"log-opts\": {
-   \"max-size\": \"100m\"
-},
-\"storage-driver\": \"overlay2\"
-}" >> /etc/docker/daemon.json
+# 9.	Generate the default containerd configuration, and save it to the newly created default file
+sudo containerd config default | sudo tee /etc/containerd/config.toml
 
-sudo systemctl daemon-reload && sudo systemctl restart docker
+# 10.	Restart containerd to ensure the new configuration file is used
+sudo systemctl restart containerd
 
-echo "Environment=\"KUBELET_EXTRA_ARGS=--fail-swap-on=false\"" >> /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+# Check status by running below command
+# sudo systemctl status containerd
 
-sudo systemctl daemon-reload && sudo systemctl restart kubelet
-sudo kubeadm init --control-plane-endpoint=master-node --upload-certs
+# 11.	Disable swap
+sudo swapoff -a
 
+# 12.	Install the dependency packages
+sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+
+# 13.	Download and add the GPG key
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.27/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+# 14.	Add Kubernetes to the repository list
+cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+deb [trusted=yes] https://pkgs.k8s.io/core:/stable:/v1.27/deb/ /
+EOF
+
+# 15.	Update the package listings
+sudo apt-get update
+
+# 16.	Install Kubernetes packages
+# Note: If you get a dpkg lock message, just wait a minute or two before trying the command again
+sudo apt-get install -y kubelet kubeadm kubectl
+
+# 17.	Turn off automatic updates
+sudo apt-mark hold kubelet kubeadm kubectl
+
+## How to check logs of GCP VM Auto Start Script
+## sudo journalctl -u google-startup-scripts.service -f
+
+## re-run a startup script like this:
+## sudo google_metadata_script_runner startup
+
+
+##############################################################################
+
+
+## For masters - 
+
+# 1.	Initialize the Kubernetes cluster on the control plane node using kubeadm
+sudo kubeadm init --pod-network-cidr 192.168.0.0/16 --kubernetes-version 1.27.11
+
+# 2.	Set kubectl access
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+# 3.	Test access to the cluster
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/calico.yaml
 
-
+######################
 
