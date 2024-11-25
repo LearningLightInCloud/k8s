@@ -1,5 +1,17 @@
 #!/bin/bash
 
+#################################################################################
+# This script will setup master node in a kubernetes cluster.
+# This script can be used to setup a kubernetes cluster to setup master node.
+# This script is compatible on Ubuntu 20.04 LTS Linux
+# Usage -
+# ./install_k8_master.sh
+# You can install this script as start-up for master node in K8 cluster
+# Any malicious intent in using this script is subject to legal action
+# Script is owned by Learning Light Team and its brand partners.
+#################################################################################
+
+
 # Add Docker's official GPG key:
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl
